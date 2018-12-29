@@ -21,7 +21,8 @@
 #define TXRX_BUF_LEN      20
 
 String input;
-
+String peerMAC;
+int peerHandle;
 
 // Create ble instance
 BLE                       ble;
@@ -56,7 +57,7 @@ GattService         uartService(service1_uuid, uartChars, sizeof(uartChars) / si
 DeviceInformationService *deviceInfo;
 
 void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
-  Serial.print("Disconnected hande : ");
+  Serial.print("Disconnected handle : ");
   Serial.println(params->handle, HEX);
   Serial.print("Disconnected reason : ");
   Serial.println(params->reason, HEX);
@@ -80,6 +81,9 @@ void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
  */
 void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
   uint8_t index;
+
+  
+  
   if(params->role == Gap::PERIPHERAL) {
     Serial.println("Peripheral ");
   }
@@ -95,9 +99,21 @@ void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
   for(index=0; index<6; index++) {
     Serial.print(params->peerAddr[index], HEX);
     Serial.print(" ");
+    peerMAC += String(params->peerAddr[index], HEX);
   }
-  Serial.println(" ");
+  
+  // Enforces that only the approved device can connect.. 
+  if (peerMAC == "7f62c359858") {
+    ble.disconnect(peerHandle, Gap::LOCAL_HOST_TERMINATED_CONNECTION); // Inverse this once we find the MAC of the Bluefruit. 
+    peerMAC = ""; // Clear the variable
+  }
 
+
+  Serial.print("Peer String :");
+  Serial.println(peerMAC);
+  
+  Serial.println(" ");
+ 
   Serial.print("The ownAddr type : ");
   Serial.println(params->ownAddrType, HEX);
   Serial.print("  The ownAddr : ");
@@ -137,6 +153,13 @@ void gattServerWriteCallBack(const GattWriteCallbackParams *Handler) {
 
   Serial.print("Handler->connHandle : ");
   Serial.println(Handler->connHandle, HEX);
+
+  peerHandle = int(Handler->connHandle);
+  Serial.print("peerHandle: ");
+  Serial.println(peerHandle);
+      
+  //if (peerMAC == "7f62c359858") ble.disconnect(peerHandle, Gap::LOCAL_HOST_TERMINATED_CONNECTION);
+  
   Serial.print("Handler->handle : ");
   Serial.println(Handler->handle, HEX);
   Serial.print("Handler->writeOp : ");
