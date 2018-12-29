@@ -5,6 +5,12 @@ Remaining Items:
 
 Done/Ignored/Fixed/Created/Removed/Tested:
 
+Update 002 @ 29.12.2018:
+- Created early version of R2D2_head.ino using information from JMK Engineer (see comments in code for information)
+- Able to command on-board LED on and off
+- Next up is trimming away more unecessary code (already removed the obligator HRM code...)
+
 Update 001 @ 29.12.2018: 
 - Created this repository for the future files
 - No development yet, researching still
+
