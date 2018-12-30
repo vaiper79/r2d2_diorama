@@ -5,12 +5,17 @@ Remaining Items:
 
 Done/Ignored/Fixed/Created/Removed/Tested/Planned:
 
+Update 004 @ 29.12.2018:
+- Done: Created early version of R2D2_base sketch for use on Adafruit Bluefruit Feather using Adafruit example code. 
+- Done: Able to make the two peers actually peer (that only took 6 hours of banging head against desk)
+- Done: Created very crude (filtering on manufacturer AFTER connection) filter to make sure only my two devices peer. Will attempt MAC filter on Bluefruit as well, seems the best option thus far. 
+
 Update 003 @ 29.12.2018:
 - Done: Managed to create a connection filter on the BLE Nano 2. Once I figure out he MAC on the Bluefruit I can make sure that, and only that, will be allowed to connect. No neighbors or others connecting and making life difficult.. Will also lower RF power so it should be close proximity only.
 - Done: Made some notes around the code. Seems most of what is there is needed at this point. Will probably make the Serial.prints debug code at some point.
 
 Update 002 @ 29.12.2018:
-- Done: Created early version of R2D2_head.ino using information from JMK Engineer (see comments in code for information)
+- Done: Created early version of R2D2_head sketch using information from JMK Engineer (see comments in code for information)
 - Done: Able to command on-board LED on and off
 - Planned: Next up is trimming away more unecessary code (already removed the obligator HRM code...)
 
