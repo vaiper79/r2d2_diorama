@@ -13,8 +13,15 @@
  * IN THE SOFTWARE.
  */
 
-// Extra comments by JMK Engineer: https://www.youtube.com/channel/UC9AIBld20gHCi1OdCz3K8wA && https://github.com/jmkuss/BLE_Nano2_Demo/blob/master/BLE_SimplePeripheral_10_4_18.ino
- 
+ /*
+  * Extra comments by JMK Engineer: https://www.youtube.com/channel/UC9AIBld20gHCi1OdCz3K8wA && https://github.com/jmkuss/BLE_Nano2_Demo/blob/master/BLE_SimplePeripheral_10_4_18.ino
+  */
+
+/*
+ * R2D2_head.h, code that will eventually be running on a RedBear BLE Nano v2 inside a Bandai 1/12th R2D2's head..All this to control some LEDs..go big (small) or go home. 
+ */
+
+// 
 #include <nRF5x_BLE_API.h>
 
 #define DEVICE_NAME       "R2D2_head"
@@ -30,27 +37,28 @@ BLE                       ble;
 Ticker                    ticker1s;
 
 // The uuid of service and characteristics
-static const uint8_t service1_uuid[]         = {0x71, 0x3D, 0, 0, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
-static const uint8_t service1_chars1_uuid[]  = {0x71, 0x3D, 0, 2, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
-static const uint8_t service1_chars2_uuid[]  = {0x71, 0x3D, 0, 3, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
-static const uint8_t service1_chars3_uuid[]  = {0x71, 0x3D, 0, 4, 0x50, 0x3E, 0x4C, 0x75, 0xBA, 0x94, 0x31, 0x48, 0xF1, 0x8D, 0x94, 0x1E};
+static const uint8_t service1_uuid[]        = {0x6E, 0x40, 0, 1, 0xB5, 0xA3, 0xF3, 0x93, 0xE0, 0xA9, 0xE5, 0x0E, 0x24, 0xDC, 0xCA, 0x9E};
+static const uint8_t service1_tx_uuid[]     = {0x6E, 0x40, 0, 3, 0xB5, 0xA3, 0xF3, 0x93, 0xE0, 0xA9, 0xE5, 0x0E, 0x24, 0xDC, 0xCA, 0x9E};
+static const uint8_t service1_rx_uuid[]     = {0x6E, 0x40, 0, 2, 0xB5, 0xA3, 0xF3, 0x93, 0xE0, 0xA9, 0xE5, 0x0E, 0x24, 0xDC, 0xCA, 0x9E};
 
 // Used in advertisement
-static const uint8_t uart_base_uuid_rev[]    = {0x1E, 0x94, 0x8D, 0xF1, 0x48, 0x31, 0x94, 0xBA, 0x75, 0x4C, 0x3E, 0x50, 0, 0, 0x3D, 0x71};
+//static const uint8_t uart_base_uuid_rev[]    = {0x1E, 0x94, 0x8D, 0xF1, 0x48, 0x31, 0x94, 0xBA, 0x75, 0x4C, 0x3E, 0x50, 0, 0, 0x3D, 0x71};
+static const uint8_t uart_base_uuid_rev[]    = {0x9E, 0xCA, 0xDC, 0x24, 0x0E, 0xE5, 0xA9, 0xE0, 0x93, 0xF3, 0xA3, 0xB5, 1, 0, 0x40, 0x6E};
 
 // Initialize value of chars
 uint8_t chars1_value[TXRX_BUF_LEN] = {0};
-uint8_t chars2_value[TXRX_BUF_LEN] = {1,2,3};
-uint8_t chars3_value[TXRX_BUF_LEN] = {0};
+uint8_t chars2_value[TXRX_BUF_LEN] = {0};
+//uint8_t chars3_value[TXRX_BUF_LEN] = {0};
 
 // Create characteristic - for custom service , Joe/Mike demo.
 // "1") Writable by central, 
 // "2") Readable by central, (Will be updated automatically as loop back for write )
 // "3") Reported/updated to central at 1 sec interval task time:
-GattCharacteristic  characteristic1(service1_chars1_uuid, chars1_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE_WITHOUT_RESPONSE );
-GattCharacteristic  characteristic2(service1_chars2_uuid, chars2_value, 3, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ);
-GattCharacteristic  characteristic3(service1_chars3_uuid, chars3_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-GattCharacteristic *uartChars[] = {&characteristic1, &characteristic2, &characteristic3};
+GattCharacteristic  characteristic1(service1_tx_uuid, chars1_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE_WITHOUT_RESPONSE );
+GattCharacteristic  characteristic2(service1_rx_uuid, chars2_value, 3, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ);
+//GattCharacteristic  characteristic3(service1_chars3_uuid, chars3_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
+//GattCharacteristic *uartChars[] = {&characteristic1, &characteristic2, &characteristic3};
+GattCharacteristic *uartChars[] = {&characteristic1, &characteristic2};
 //Create service
 GattService         uartService(service1_uuid, uartChars, sizeof(uartChars) / sizeof(GattCharacteristic *));
 
@@ -66,6 +74,8 @@ void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
 }
 
 /** @brief  Connection callback handle
+ *  
+ *  Note to self: This is code that triggers during a connection attempt
  *
  *  @param[in] *params   params->handle : The ID for this connection
  *                       params->role : PERIPHERAL  = 0x1, // Peripheral Role
@@ -82,8 +92,8 @@ void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
 void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
   uint8_t index;
 
-  
-  
+  Serial.println("Connecting...");
+
   if(params->role == Gap::PERIPHERAL) {
     Serial.println("Peripheral ");
   }
@@ -103,15 +113,12 @@ void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
   }
   
   // Enforces that only the approved device can connect.. 
-  if (peerMAC == "7f62c359858") {
+  if (peerMAC != "a9e8668682fc") {
     ble.disconnect(peerHandle, Gap::LOCAL_HOST_TERMINATED_CONNECTION); // Inverse this once we find the MAC of the Bluefruit. 
     peerMAC = ""; // Clear the variable
+    Serial.println("Wrong peer... ");
   }
 
-
-  Serial.print("Peer String :");
-  Serial.println(peerMAC);
-  
   Serial.println(" ");
  
   Serial.print("The ownAddr type : ");
@@ -131,9 +138,14 @@ void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
   Serial.println(params->connectionParams->slaveLatency, HEX);
   Serial.print("The connectionSupervisionTimeout : ");
   Serial.println(params->connectionParams->connectionSupervisionTimeout, HEX);
+
+  Serial.println("Connected...");
 }
 
 /** @brief  write callback handle of Gatt server
+ *
+ * Note to self: This is where we want to put code that should listen for commands from central. This fucntion ONLY 
+ * triggers when the write characteristic is written to. 
  *
  *  @param[in] *Handler   Handler->connHandle : The handle of the connection that triggered the event
  *                        Handler->handle : Attribute Handle to which the write operation applies
@@ -155,11 +167,10 @@ void gattServerWriteCallBack(const GattWriteCallbackParams *Handler) {
   Serial.println(Handler->connHandle, HEX);
 
   peerHandle = int(Handler->connHandle);
+  
   Serial.print("peerHandle: ");
   Serial.println(peerHandle);
       
-  //if (peerMAC == "7f62c359858") ble.disconnect(peerHandle, Gap::LOCAL_HOST_TERMINATED_CONNECTION);
-  
   Serial.print("Handler->handle : ");
   Serial.println(Handler->handle, HEX);
   Serial.print("Handler->writeOp : ");
@@ -210,6 +221,8 @@ void gattServerWriteCallBack(const GattWriteCallbackParams *Handler) {
 
 /**
  * @brief  Timer task callback handle
+ * 
+ * Note to self: If I need stuff to happen on a regular basis..here.. the timer is set elsewhere. Search for: Init timer task
  */
 void task_handle(void) {
   //static uint16_t value;
@@ -248,6 +261,9 @@ void task_handle(void) {
 
 /**
  * @brief  Set advertisement
+ * 
+ * Note to self: This is what is sent out during advertisement. 
+ * 
  */
 void setAdvertisement(void) {
   // A list of Advertising Data types commonly used by peripherals.
@@ -285,38 +301,49 @@ void setAdvertisement(void) {
 
 void setup() {
   // put your setup code here, to run once
-  Serial.begin(9600);
-  Serial.println("Start ");
+  Serial.begin(115200);
+  Serial.println("Initialzing... ");
   pinMode(D13, OUTPUT);
+  
   // Init timer task
   //ticker1s.attach(task_handle, 10);
+  
   // Init ble
   ble.init();
   ble.onConnection(connectionCallBack);
   ble.onDisconnection(disconnectionCallBack);
   ble.onDataWritten(gattServerWriteCallBack);
+  
   // set advertisement
   setAdvertisement();
+  
   // set adv_type(enum from 0)
   //    ADV_CONNECTABLE_UNDIRECTED
   //    ADV_CONNECTABLE_DIRECTED
   //    ADV_SCANNABLE_UNDIRECTED
   //    ADV_NON_CONNECTABLE_UNDIRECTED
   ble.setAdvertisingType(GapAdvertisingParams::ADV_CONNECTABLE_UNDIRECTED);
+  
   // add service
   deviceInfo = new DeviceInformationService(ble, "Industrial Automaton", "R2 Series", "D2", "R", "fw-rev1", "soft-rev1");
   ble.addService(uartService);
+  
   // set device name
   ble.setDeviceName((const uint8_t *)DEVICE_NAME);
+  
   // set tx power,valid values are -40, -20, -16, -12, -8, -4, 0, 4
   ble.setTxPower(4);
+  
   // set adv_interval, 100ms in multiples of 0.625ms.
   ble.setAdvertisingInterval(160);
+  
   // set adv_timeout, in seconds
   ble.setAdvertisingTimeout(0);
-  // ger BLE stack version
-  Serial.print("BLE stack verison is : ");
+  
+  // get BLE stack version
+  Serial.print("BLE stack verison is: ");
   Serial.println(ble.getVersion());
+    
   // start advertising
   ble.startAdvertising();
   Serial.println("start advertising ");
