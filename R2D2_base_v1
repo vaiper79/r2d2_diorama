@@ -21,6 +21,8 @@
 BLEClientDis  clientDis;
 BLEClientUart clientUart;
 
+String peerMAC;
+
 void setup()
 {
   Serial.begin(115200);
@@ -67,22 +69,37 @@ void setup()
  * Callback invoked when scanner pick up an advertising data
  * @param report Structural advertising data
  */
-void scan_callback(ble_gap_evt_adv_report_t* report)
-{
-  // Check if advertising contain BleUart service
-  if ( Bluefruit.Scanner.checkReportForService(report, clientUart) )
-  //if ( Bluefruit.Scanner.checkReportForUuid(report, 0x6E400001B5A3F393E0A9E50E24DCCA9E) )
-  {
-    Serial.print("BLE UART service detected. Connecting ... ");
+void scan_callback(ble_gap_evt_adv_report_t* report){
+  PRINT_LOCATION();
+  uint8_t len = 0;
+  uint8_t buffer[32];
+  memset(buffer, 0, sizeof(buffer));
+  
+  // MAC is in little endian --> print reverse
+  Serial.print("Remote MAC: ");
+  Serial.printBufferReverse(report->peer_addr.addr, 6, ':');
+  Serial.print("\n");
 
-    // Connect to device with bleuart service in advertising
-    Bluefruit.Central.connect(report);
-  }else
-  {      
-    // For Softdevice v6: after received a report, scanner will be paused
-    // We need to call Scanner resume() to continue scanning
-    Serial.println("Scanning... ");
-    Bluefruit.Scanner.resume();
+  for (int index = 5; -1 < index; index--) {
+    peerMAC += report->peer_addr.addr[index];
+  }
+
+  if (peerMAC == "2191445572222245"){   // The MAC of the peer in decimal, checking..
+    peerMAC = "";
+    // Check if advertising contain BleUart service
+    if ( Bluefruit.Scanner.checkReportForService(report, clientUart ) ){
+      Serial.print("BLE UART service detected. Connecting ... ");
+  
+      // Connect to device with bleuart service in advertising
+      Bluefruit.Central.connect(report);
+      
+    }else{      
+      // For Softdevice v6: after received a report, scanner will be paused
+      // We need to call Scanner resume() to continue scanning
+      Serial.println("Scanning... ");
+      
+      Bluefruit.Scanner.resume();
+    }
   }
 }
 
@@ -92,6 +109,7 @@ void scan_callback(ble_gap_evt_adv_report_t* report)
  */
 void connect_callback(uint16_t conn_handle)
 {
+
   Serial.println("Connected");
 
   Serial.print("Dicovering DIS ... ");

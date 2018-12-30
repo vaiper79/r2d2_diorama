@@ -5,6 +5,9 @@ Remaining Items:
 
 Done/Ignored/Fixed/Created/Removed/Tested/Planned:
 
+Update 005 @ 29.12.2018:
+- Done: Wrote a kind of MAC filter, will now only accept R2's head.. This happens during the scan phase. 
+
 Update 004 @ 29.12.2018:
 - Done: Created early version of R2D2_base sketch for use on Adafruit Bluefruit Feather using Adafruit example code. 
 - Done: Able to make the two peers actually peer (that only took 6 hours of banging head against desk)
