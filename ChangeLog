@@ -5,6 +5,11 @@ Remaining Items:
 
 Done/Ignored/Fixed/Created/Removed/Tested/Planned:
 
+Update 006 @ 01.12.2018:
+- Fixed: Two-Way communications now work. Had to re-visit the examples of both boards for ideas since posting to the Adafruit forum on New Years Eve yielded little response..heh.. 
+- Planned: Proof-of-concept with controlling onboard LEDs
+- Planned: Cleaning up the codebase some more to remove unecessary stuff.. 
+
 Update 005 @ 29.12.2018:
 - Done: Wrote a kind of MAC filter, will now only accept R2's head.. This happens during the scan phase. 
 - Done: Small clean up of R2D2_head

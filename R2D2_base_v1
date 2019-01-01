@@ -21,19 +21,20 @@
 BLEClientDis  clientDis;
 BLEClientUart clientUart;
 
-String peerMAC;
+String peerMAC ="";
 
-void setup()
-{
+void setup(){
   Serial.begin(115200);
-  while ( !Serial ) delay(10);   // for nrf52840 with native usb
+  delay(2000); // Getting gibberish at the beginning without at least 2 seconds delay..
 
+  Serial.print("\n\n\n\n\n");
   Serial.println("R2D2 Base");
   Serial.println("-----------------------------------\n");
   
   // Initialize Bluefruit with maximum connections as Peripheral = 0, Central = 1
   // SRAM usage required by SoftDevice will increase dramatically with number of connections
   Bluefruit.begin(0, 1);
+ 
   
   Bluefruit.setName("R2D2_base");
 
@@ -74,61 +75,62 @@ void scan_callback(ble_gap_evt_adv_report_t* report){
   uint8_t len = 0;
   uint8_t buffer[32];
   memset(buffer, 0, sizeof(buffer));
+
+  //Starting
+  Serial.println("Initializing...");
   
   // MAC is in little endian --> print reverse
-  Serial.print("Remote MAC: ");
+  Serial.print("Remote MAC:   ");
   Serial.printBufferReverse(report->peer_addr.addr, 6, ':');
   Serial.print("\n");
+  Serial.println("Should match: DB:90:37:48:DE:F5");
 
+  // Put peer address in variable for comparison
   for (int index = 5; -1 < index; index--) {
     peerMAC += report->peer_addr.addr[index];
   }
-
-  if (peerMAC == "2191445572222245"){   // The MAC of the peer in decimal, checking..
-    peerMAC = "";
+  
+  // The MAC of the peer in decimal..make sure we only connect to the right device
+  if (peerMAC == "2191445572222245"){   
+    
     // Check if advertising contain BleUart service
     if ( Bluefruit.Scanner.checkReportForService(report, clientUart ) ){
       Serial.print("BLE UART service detected. Connecting ... ");
-  
+      
       // Connect to device with bleuart service in advertising
       Bluefruit.Central.connect(report);
-      
     }else{      
+      
       // For Softdevice v6: after received a report, scanner will be paused
       // We need to call Scanner resume() to continue scanning
-      Serial.println("Scanning... ");
-      
       Bluefruit.Scanner.resume();
     }
   }
+  // Reset the variable for next run..
+  peerMAC = "";
 }
 
 /**
  * Callback invoked when an connection is established
  * @param conn_handle
  */
-void connect_callback(uint16_t conn_handle)
-{
-
+void connect_callback(uint16_t conn_handle){
   Serial.println("Connected");
-
   Serial.print("Dicovering DIS ... ");
-  if ( clientDis.discover(conn_handle) )
-  {
+  if ( clientDis.discover(conn_handle) ){
     Serial.println("Found it");
     char buffer[32+1];
     
     // read and print out Manufacturer
     memset(buffer, 0, sizeof(buffer));
-    if ( clientDis.getManufacturer(buffer, sizeof(buffer)) )
-    {
-      Serial.print("Manufacturer: ");
-      Serial.println(buffer);
+    if ( clientDis.getManufacturer(buffer, sizeof(buffer)) ){
+      //Serial.print("Manufacturer: ");
+      //Serial.println(buffer);
 
       // Crude way of making sure the correct peers are peering.. 
       // Should try to kill this process earlier, during scan..but haven't figured out the 
       // format of the UUID filters.... 
-      if (String(buffer) == "Industrial Automaton") {
+      if (String(buffer) == "Industrial Automaton"){
         Serial.println("Hello R2..we meet again!");
       }else{
         Bluefruit.Central.disconnect(conn_handle);
@@ -138,32 +140,28 @@ void connect_callback(uint16_t conn_handle)
 
     // read and print out Model Number
     memset(buffer, 0, sizeof(buffer));
-    if ( clientDis.getModel(buffer, sizeof(buffer)) )
-    {
-      Serial.print("Model: ");
-      Serial.println(buffer);
+    if (clientDis.getModel(buffer, sizeof(buffer))){
+      //Serial.print("Model: ");
+      //Serial.println(buffer);
     }
-
-    Serial.println();
+    //Serial.println();
   }  
 
   Serial.print("Discovering BLE Uart Service ... ");
 
-  if ( clientUart.discover(conn_handle) )
-  {
+  if ( clientUart.discover(conn_handle) ){
     Serial.println("Found it");
 
     Serial.println("Enable TXD's notify");
     clientUart.enableTXD();
 
     Serial.println("Ready to receive from peripheral");
-  }else
-  {
+  }else{
     Serial.println("Found NONE");
     
-    // disconect since we couldn't find bleuart service
+    // disconnect since we couldn't find bleuart service
     Bluefruit.Central.disconnect(conn_handle);
-  }  
+  }    
 }
 
 /**
@@ -171,12 +169,12 @@ void connect_callback(uint16_t conn_handle)
  * @param conn_handle
  * @param reason is a BLE_HCI_STATUS_CODE which can be found in ble_hci.h
  */
-void disconnect_callback(uint16_t conn_handle, uint8_t reason)
-{
+void disconnect_callback(uint16_t conn_handle, uint8_t reason){
   (void) conn_handle;
   (void) reason;
   
   Serial.println("Disconnected");
+  Serial.print("\n\n\n\n\n");
 }
 
 /**
@@ -184,15 +182,11 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason)
  * @param uart_svc Reference object to the service where the data 
  * arrived. In this example it is clientUart
  */
-void bleuart_rx_callback(BLEClientUart& uart_svc)
-{
+void bleuart_rx_callback(BLEClientUart& uart_svc){
   Serial.print("[RX]: ");
-  
-  while ( uart_svc.available() )
-  {
+  while ( uart_svc.available() ){
     Serial.print( (char) uart_svc.read() );
   }
-
   Serial.println();
 }
 
@@ -213,6 +207,7 @@ void loop()
         Serial.readBytes(str, 20);
         
         clientUart.print( str );
+        Serial.println(str);
       }
     }
   }

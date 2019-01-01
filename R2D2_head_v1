@@ -30,41 +30,42 @@
 String input;
 String peerMAC;
 int peerHandle;
+uint8_t buf[TXRX_BUF_LEN];
+uint16_t bytesRead = 20;
+const byte numChars = 32;
+char receivedChars[numChars];   // an array to store the received data
+
+boolean newData = false;
 
 // Create ble instance
 BLE                       ble;
-// Create a timer task
-Ticker                    ticker1s;
+Timeout                   timeout;
+
+static uint8_t rx_buf[TXRX_BUF_LEN];
+static uint8_t tx_buf[TXRX_BUF_LEN];
+static uint8_t rx_buf_num;
+static uint8_t tx_buf_num;
+static uint8_t rx_state=0;
 
 // The uuid of service and characteristics
-static const uint8_t service1_uuid[]        = {0x6E, 0x40, 0, 1, 0xB5, 0xA3, 0xF3, 0x93, 0xE0, 0xA9, 0xE5, 0x0E, 0x24, 0xDC, 0xCA, 0x9E};
-static const uint8_t service1_tx_uuid[]     = {0x6E, 0x40, 0, 3, 0xB5, 0xA3, 0xF3, 0x93, 0xE0, 0xA9, 0xE5, 0x0E, 0x24, 0xDC, 0xCA, 0x9E};
-static const uint8_t service1_rx_uuid[]     = {0x6E, 0x40, 0, 2, 0xB5, 0xA3, 0xF3, 0x93, 0xE0, 0xA9, 0xE5, 0x0E, 0x24, 0xDC, 0xCA, 0x9E};
+static const uint8_t service1_uuid[]        = {0x6E, 0x40, 0x00, 0x01, 0xB5, 0xA3, 0xF3, 0x93, 0xE0, 0xA9, 0xE5, 0x0E, 0x24, 0xDC, 0xCA, 0x9E};
+static const uint8_t service1_rx_uuid[]     = {0x6E, 0x40, 0x00, 0x03, 0xB5, 0xA3, 0xF3, 0x93, 0xE0, 0xA9, 0xE5, 0x0E, 0x24, 0xDC, 0xCA, 0x9E};
+static const uint8_t service1_tx_uuid[]     = {0x6E, 0x40, 0x00, 0x02, 0xB5, 0xA3, 0xF3, 0x93, 0xE0, 0xA9, 0xE5, 0x0E, 0x24, 0xDC, 0xCA, 0x9E};
+static const uint8_t uart_base_uuid_rev[]   = {0x9E, 0xCA, 0xDC, 0x24, 0x0E, 0xE5, 0xA9, 0xE0, 0x93, 0xF3, 0xA3, 0xB5, 0x01, 0x00, 0x40, 0x6E};
 
-// Used in advertisement
-//static const uint8_t uart_base_uuid_rev[]    = {0x1E, 0x94, 0x8D, 0xF1, 0x48, 0x31, 0x94, 0xBA, 0x75, 0x4C, 0x3E, 0x50, 0, 0, 0x3D, 0x71};
-static const uint8_t uart_base_uuid_rev[]    = {0x9E, 0xCA, 0xDC, 0x24, 0x0E, 0xE5, 0xA9, 0xE0, 0x93, 0xF3, 0xA3, 0xB5, 1, 0, 0x40, 0x6E};
+uint8_t tx_value[TXRX_BUF_LEN] = {0,};
+uint8_t rx_value[TXRX_BUF_LEN] = {0,};
 
-// Initialize value of chars
-uint8_t chars1_value[TXRX_BUF_LEN] = {0};
-uint8_t chars2_value[TXRX_BUF_LEN] = {0};
-//uint8_t chars3_value[TXRX_BUF_LEN] = {0};
-
-// Create characteristic - for custom service , Joe/Mike demo.
-// "1") Writable by central, 
-// "2") Readable by central, (Will be updated automatically as loop back for write )
-// "3") Reported/updated to central at 1 sec interval task time:
-GattCharacteristic  characteristic1(service1_tx_uuid, chars1_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE_WITHOUT_RESPONSE );
-GattCharacteristic  characteristic2(service1_rx_uuid, chars2_value, 3, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ);
-//GattCharacteristic  characteristic3(service1_chars3_uuid, chars3_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
-//GattCharacteristic *uartChars[] = {&characteristic1, &characteristic2, &characteristic3};
+// Create characteristic
+GattCharacteristic  characteristic1(service1_tx_uuid, tx_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE | GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE_WITHOUT_RESPONSE );
+GattCharacteristic  characteristic2(service1_rx_uuid, rx_value, 1, TXRX_BUF_LEN, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY);
 GattCharacteristic *uartChars[] = {&characteristic1, &characteristic2};
-//Create service
 GattService         uartService(service1_uuid, uartChars, sizeof(uartChars) / sizeof(GattCharacteristic *));
 
 DeviceInformationService *deviceInfo;
 
 void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
+  Serial.println("Disconnected ...");
   Serial.print("Disconnected handle : ");
   Serial.println(params->handle, HEX);
   Serial.print("Disconnected reason : ");
@@ -73,22 +74,6 @@ void disconnectionCallBack(const Gap::DisconnectionCallbackParams_t *params) {
   ble.startAdvertising();
 }
 
-/** @brief  Connection callback handle
- *  
- *  Note to self: This is code that triggers during a connection attempt
- *
- *  @param[in] *params   params->handle : The ID for this connection
- *                       params->role : PERIPHERAL  = 0x1, // Peripheral Role
- *                                      CENTRAL     = 0x2, // Central Role.
- *                       params->peerAddrType : The peer's BLE address type
- *                       params->peerAddr : The peer's BLE address
- *                       params->ownAddrType : This device's BLE address type
- *                       params->ownAddr : This devices's BLE address
- *                       params->connectionParams->minConnectionInterval
- *                       params->connectionParams->maxConnectionInterval
- *                       params->connectionParams->slaveLatency
- *                       params->connectionParams->connectionSupervisionTimeout
- */
 void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
   uint8_t index;
 
@@ -106,6 +91,7 @@ void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
   Serial.print("The peerAddr type : ");
   Serial.println(params->peerAddrType, HEX);
   Serial.print("  The peerAddr : ");
+  
   for(index=0; index<6; index++) {
     Serial.print(params->peerAddr[index], HEX);
     Serial.print(" ");
@@ -114,10 +100,11 @@ void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
   
   // Enforces that only the approved device can connect.. 
   if (peerMAC != "a9e8668682fc") {
-    ble.disconnect(peerHandle, Gap::LOCAL_HOST_TERMINATED_CONNECTION); // Inverse this once we find the MAC of the Bluefruit. 
-    peerMAC = ""; // Clear the variable
+    ble.disconnect(peerHandle, Gap::LOCAL_HOST_TERMINATED_CONNECTION);  
     Serial.println("Wrong peer... ");
   }
+  peerMAC = ""; // Clear the variable
+
 
   Serial.println(" ");
  
@@ -142,225 +129,121 @@ void connectionCallBack( const Gap::ConnectionCallbackParams_t *params ) {
   Serial.println("Connected...");
 }
 
-/** @brief  write callback handle of Gatt server
- *
- * Note to self: This is where we want to put code that should listen for commands from central. This fucntion ONLY 
- * triggers when the write characteristic is written to. 
- *
- *  @param[in] *Handler   Handler->connHandle : The handle of the connection that triggered the event
- *                        Handler->handle : Attribute Handle to which the write operation applies
- *                        Handler->writeOp : OP_INVALID               = 0x00,  // Invalid operation.
- *                                           OP_WRITE_REQ             = 0x01,  // Write request.
- *                                           OP_WRITE_CMD             = 0x02,  // Write command.
- *                                           OP_SIGN_WRITE_CMD        = 0x03,  // Signed write command.
- *                                           OP_PREP_WRITE_REQ        = 0x04,  // Prepare write request.
- *                                           OP_EXEC_WRITE_REQ_CANCEL = 0x05,  // Execute write request: cancel all prepared writes.
- *                                           OP_EXEC_WRITE_REQ_NOW    = 0x06,  // Execute write request: immediately execute all prepared writes.
- *                        Handler->offset : Offset for the write operation
- *                        Handler->len : Length (in bytes) of the data to write
- *                        Handler->data : Pointer to the data to write
- */
 void gattServerWriteCallBack(const GattWriteCallbackParams *Handler) {
-  uint8_t index;
-
-  Serial.print("Handler->connHandle : ");
-  Serial.println(Handler->connHandle, HEX);
-
-  peerHandle = int(Handler->connHandle);
+  uint16_t index;
   
-  Serial.print("peerHandle: ");
-  Serial.println(peerHandle);
-      
-  Serial.print("Handler->handle : ");
-  Serial.println(Handler->handle, HEX);
-  Serial.print("Handler->writeOp : ");
-  Serial.println(Handler->writeOp, HEX);
-  Serial.print("Handler->offset : ");
-  Serial.println(Handler->offset, HEX);
-  Serial.print("Handler->len : ");
-  Serial.println(Handler->len, HEX);
-  for(index=0; index<Handler->len; index++) {
-    Serial.print(Handler->data[index], HEX);
-  }
-  Serial.println(" ");
-
-  uint8_t buf[TXRX_BUF_LEN];
-  uint16_t bytesRead = 20;
-  Serial.println("Write Handle : ");
-  // Check the attribute belong to which characteristic
   if (Handler->handle == characteristic1.getValueAttribute().getHandle()) {
-    // Read the value of this characteristic, 
-      // just written (sent) by "Central" 
-      // and recieved by the BLE Nano-2characteristic
-    ble.readCharacteristicValue(characteristic1.getValueAttribute().getHandle(), buf, &bytesRead);
-
-    for(index=0; index<bytesRead; index++) {
-      Serial.print(buf[index], HEX);
-      input += String(buf[index], HEX);
+    for(index=0; index<Handler->len; index++) {
+      Serial.write(Handler->data[index]);
     }
-    
-    if (input == "31"){
-      digitalWrite(D13, HIGH);
-      input = "";
-    }
-    if (input == "30"){
-      digitalWrite(D13, LOW);
-      input = "";
-    }
-    
-    Serial.println(" ");
-
-        // ### Added two lines here:
-  // Re-Load READ characteristic #2 with what cell phone just wrote to
-    // characteristic #1 as a loop back test to verify
-  // that the Nano-2 really did receive what it sent.
-    Serial.println("Put data into READ char2 as a loopback response msg..");
-    ble.updateCharacteristicValue(characteristic2.getValueAttribute().getHandle(), buf, bytesRead);
   }
 }
 
-/**
- * @brief  Timer task callback handle
- * 
- * Note to self: If I need stuff to happen on a regular basis..here.. the timer is set elsewhere. Search for: Init timer task
- */
-void task_handle(void) {
-  //static uint16_t value;
-  
-  // This println makes serial monitor scroll repeated info too much.
-  // Use led blink to know this task happens, instead
-  // Serial.println("Task handle ");
-    
-  //value++;
-  
-  // First update our custome "NOTIFY" characteristic, with the running U16 "value"
-  // if true, saved to attribute, no notification or indication is generated.
-  //ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), (uint8_t *)&value, 2, true);
-  // if false or ignore, notification or indication is generated if permit.
-  //ble.updateCharacteristicValue(characteristic3.getValueAttribute().getHandle(), (uint8_t *)&value, 2);
-
-
-  // JMK Oct 3, 2018 ----------------------------------------------------------------
-  // LED blink at task rate
-  // Toggle the output led at the task timing rate so period is 2x T
-  // 1 sec on and 1 sec off:
-  //int ledState = (value % 2) ? HIGH : LOW;
-  //digitalWrite(D13, ledState);
-  
-  // Comentary:
-  // How does D13 relate to a pin or place on the BLE-Nano 2 ?
-  // It turns out that likely D13 is some standard pin nunber (for an LED ?) on
-  // a standard Arduino board. But the BLE Nano-2 is not a standard board.
-  // But since we are using an Arduino platform the authors of this code
-  // decided to keep "D13", but they provide in the hardware support code
-  // another linked in .cpp file "pin_tranform.cpp" that actually translates
-  // D13 out to the BLE Nano-2 P0-11. This controls the tiny LED-2 on the 
-  // top of the BLE Nano 2. Ref the schematic.
-  //-----------------------------------------------------------------------------------
+void m_uart_rx_handle() {
+  //update characteristic data
+  ble.updateCharacteristicValue(characteristic2.getValueAttribute().getHandle(), rx_buf, rx_buf_num);
+  memset(rx_buf, 0x00,20);
+  rx_state = 0;
 }
 
-/**
- * @brief  Set advertisement
- * 
- * Note to self: This is what is sent out during advertisement. 
- * 
- */
-void setAdvertisement(void) {
-  // A list of Advertising Data types commonly used by peripherals.
-  //   FLAGS                              = 0x01, // Flags, refer to GapAdvertisingData::Flags_t.
-  //   INCOMPLETE_LIST_16BIT_SERVICE_IDS  = 0x02, // Incomplete list of 16-bit Service IDs.
-  //   COMPLETE_LIST_16BIT_SERVICE_IDS    = 0x03, // Complete list of 16-bit Service IDs.
-  //   INCOMPLETE_LIST_32BIT_SERVICE_IDS  = 0x04, // Incomplete list of 32-bit Service IDs (not relevant for Bluetooth 4.0).
-  //   COMPLETE_LIST_32BIT_SERVICE_IDS    = 0x05, // Complete list of 32-bit Service IDs (not relevant for Bluetooth 4.0).
-  //   INCOMPLETE_LIST_128BIT_SERVICE_IDS = 0x06, // Incomplete list of 128-bit Service IDs.
-  //   COMPLETE_LIST_128BIT_SERVICE_IDS   = 0x07, // Complete list of 128-bit Service IDs.
-  //   SHORTENED_LOCAL_NAME               = 0x08, // Shortened Local Name.
-  //   COMPLETE_LOCAL_NAME                = 0x09, // Complete Local Name.
-  //   TX_POWER_LEVEL                     = 0x0A, // TX Power Level (in dBm).
-  //   DEVICE_ID                          = 0x10, // Device ID.
-  //   SLAVE_CONNECTION_INTERVAL_RANGE    = 0x12, // Slave Connection Interval Range.
-  //   LIST_128BIT_SOLICITATION_IDS       = 0x15, // List of 128 bit service UUIDs the device is looking for.
-  //   SERVICE_DATA                       = 0x16, // Service Data.
-  //   APPEARANCE                         = 0x19, // Appearance, refer to GapAdvertisingData::Appearance_t.
-  //   ADVERTISING_INTERVAL               = 0x1A, // Advertising Interval.
-  //   MANUFACTURER_SPECIFIC_DATA         = 0xFF  // Manufacturer Specific Data.
-
-  // AD_Type_Flag : LE_LIMITED_DISCOVERABLE = 0x01, Peripheral device is discoverable for a limited period of time
-  //                LE_GENERAL_DISCOVERABLE = 0x02, Peripheral device is discoverable at any moment
-  //                BREDR_NOT_SUPPORTED     = 0x03, Peripheral device is LE only
-  //                SIMULTANEOUS_LE_BREDR_C = 0x04, Not relevant - central mode only
-  //                SIMULTANEOUS_LE_BREDR_H = 0x05, Not relevant - central mode only
-  ble.accumulateAdvertisingPayload(GapAdvertisingData::BREDR_NOT_SUPPORTED | GapAdvertisingData::LE_GENERAL_DISCOVERABLE);
-  // Add short name to advertisement
-  ble.accumulateAdvertisingPayload(GapAdvertisingData::SHORTENED_LOCAL_NAME,(const uint8_t *)"R2D2", 4);
-  // Add complete 128bit_uuid to advertisement
-  ble.accumulateAdvertisingPayload(GapAdvertisingData::COMPLETE_LIST_128BIT_SERVICE_IDS,(const uint8_t *)uart_base_uuid_rev, sizeof(uart_base_uuid_rev));
-  // Add complete device name to scan response data
-  ble.accumulateScanResponse(GapAdvertisingData::COMPLETE_LOCAL_NAME,(const uint8_t *)DEVICE_NAME, sizeof(DEVICE_NAME) - 1);
+void uart_handle(uint32_t id, SerialIrq event) {
+  // Serial rx IRQ
+  if(event == RxIrq) {
+    if (rx_state == 0) {
+      rx_state = 1;
+      timeout.attach_us(m_uart_rx_handle, 100000);
+      rx_buf_num=0;
+    }
+    while(Serial.available()) {
+      if(rx_buf_num < 20) {
+        rx_buf[rx_buf_num] = Serial.read();
+        rx_buf_num++;
+      }
+      else
+        Serial.read();
+    }
+  }
 }
 
 void setup() {
   // put your setup code here, to run once
   Serial.begin(115200);
+  Serial.print("\n\n\n\n\n");
+  Serial.println("R2D2 Head");
+  Serial.println("-----------------------------------\n");
   Serial.println("Initialzing... ");
   pinMode(D13, OUTPUT);
   
-  // Init timer task
-  //ticker1s.attach(task_handle, 10);
-  
   // Init ble
   ble.init();
+
+  deviceInfo = new DeviceInformationService(ble, "Industrial Automaton", "R2 Series", "D2", "R", "fw-rev1", "soft-rev1");
+  
   ble.onConnection(connectionCallBack);
   ble.onDisconnection(disconnectionCallBack);
   ble.onDataWritten(gattServerWriteCallBack);
   
-  // set advertisement
-  setAdvertisement();
-  
-  // set adv_type(enum from 0)
-  //    ADV_CONNECTABLE_UNDIRECTED
-  //    ADV_CONNECTABLE_DIRECTED
-  //    ADV_SCANNABLE_UNDIRECTED
-  //    ADV_NON_CONNECTABLE_UNDIRECTED
+  ble.accumulateAdvertisingPayload(GapAdvertisingData::BREDR_NOT_SUPPORTED | GapAdvertisingData::LE_GENERAL_DISCOVERABLE);
+  ble.accumulateAdvertisingPayload(GapAdvertisingData::SHORTENED_LOCAL_NAME,
+                                   (const uint8_t *)"TXRX", sizeof("R2D2") - 1);
+  ble.accumulateAdvertisingPayload(GapAdvertisingData::COMPLETE_LIST_128BIT_SERVICE_IDS,
+                                   (const uint8_t *)uart_base_uuid_rev, sizeof(uart_base_uuid_rev));
+
   ble.setAdvertisingType(GapAdvertisingParams::ADV_CONNECTABLE_UNDIRECTED);
-  
   // add service
-  deviceInfo = new DeviceInformationService(ble, "Industrial Automaton", "R2 Series", "D2", "R", "fw-rev1", "soft-rev1");
   ble.addService(uartService);
-  
   // set device name
   ble.setDeviceName((const uint8_t *)DEVICE_NAME);
-  
   // set tx power,valid values are -40, -20, -16, -12, -8, -4, 0, 4
   ble.setTxPower(4);
-  
   // set adv_interval, 100ms in multiples of 0.625ms.
   ble.setAdvertisingInterval(160);
-  
   // set adv_timeout, in seconds
   ble.setAdvertisingTimeout(0);
-  
-  // get BLE stack version
-  Serial.print("BLE stack verison is: ");
-  Serial.println(ble.getVersion());
-    
   // start advertising
   ble.startAdvertising();
-  Serial.println("start advertising ");
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  
-  // Presently we do not need much code here since 
-  // since BLE is event driven so all of the real time
-  // processing are in the 
-  //   the timer tick  (task_handle),
-  //  onConnection(connectionCallBack),
-  //  onDisconnection(disconnectionCallBack),
-  //  onDataWritten(gattServerWriteCallBack),
-  //
-  // event call back code.
-  
+
+    recvWithEndMarker();
+    showNewData();
+
+    
+
   ble.waitForEvent();
+}
+
+
+void recvWithEndMarker() {
+    char endMarker = '\n';
+    char r;
+    
+    while (Serial.available() > 0 && newData == false) {
+        r = Serial.read();
+
+        if (r != endMarker) {
+            tx_buf[tx_buf_num] = r;
+            tx_buf_num++;
+            if (tx_buf_num >= numChars) {
+               tx_buf_num = numChars - 1;
+            }
+        }
+        else {
+            tx_buf[tx_buf_num] = '\0'; // terminate the string
+            tx_buf_num = 0;
+            newData = true;
+        }
+    }
+    
+}
+
+void showNewData() {
+    if (newData == true) {
+        Serial.print("[TX]");
+        newData = false;
+        ble.updateCharacteristicValue(characteristic1.getValueAttribute().getHandle(), tx_buf, sizeof(tx_buf));
+
+    }
 }
