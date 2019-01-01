@@ -35,7 +35,6 @@ void setup(){
   // SRAM usage required by SoftDevice will increase dramatically with number of connections
   Bluefruit.begin(0, 1);
  
-  
   Bluefruit.setName("R2D2_base");
 
   // Configure DIS client
