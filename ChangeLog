@@ -5,6 +5,9 @@ Remaining Items:
 
 Done/Ignored/Fixed/Created/Removed/Tested/Planned:
 
+Update 007 @ 01.12.2018: 
+- Done: Added simple code to turn on and off the on-board LED by way of a text command on the remote. This uses String..but, don't worry I will change that later, the commands going back and forth can be numbers.. Trying to use String as little as possible..
+
 Update 006 @ 01.12.2018:
 - Fixed: Two-Way communications now work. Had to re-visit the examples of both boards for ideas since posting to the Adafruit forum on New Years Eve yielded little response..heh.. 
 - Planned: Proof-of-concept with controlling onboard LEDs

@@ -35,6 +35,8 @@ uint16_t bytesRead = 20;
 const byte numChars = 32;
 char receivedChars[numChars];   // an array to store the received data
 
+String rx;
+
 boolean newData = false;
 
 // Create ble instance
@@ -133,10 +135,22 @@ void gattServerWriteCallBack(const GattWriteCallbackParams *Handler) {
   uint16_t index;
   
   if (Handler->handle == characteristic1.getValueAttribute().getHandle()) {
+    Serial.print("[RX]: ");
     for(index=0; index<Handler->len; index++) {
       Serial.write(Handler->data[index]);
+      rx += Handler->data[index];
     }
   }
+  Serial.print(rx);
+  if (rx == "7911010"){ // On
+    Serial.println(" = ON");
+    digitalWrite(D13, HIGH);
+  }
+  if (rx == "7910210210"){ // Off
+    Serial.println(" = OFF");
+    digitalWrite(D13, LOW);
+  }
+  rx = "";  
 }
 
 void m_uart_rx_handle() {
@@ -172,6 +186,7 @@ void setup() {
   Serial.println("R2D2 Head");
   Serial.println("-----------------------------------\n");
   Serial.println("Initialzing... ");
+  
   pinMode(D13, OUTPUT);
   
   // Init ble
